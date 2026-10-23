@@ -1,24 +1,30 @@
 # Tugas 1 — Analisis Pitfall FoodGo
 
-**Kelompok:** [nama kelompok]
+**Kelompok 7:**
 
 | Nama | NIM | Kontribusi |
 |---|---|---|
-| [nama 1] | [nim] | [pitfall/bagian yang dikerjakan] |
-| [nama 2] | [nim] | [pitfall/bagian yang dikerjakan] |
-| [nama 3] | [nim] | [pitfall/bagian yang dikerjakan] |
+| Aria Restu Pambudi | 103072400168 | Pitfall 1 |
+| Bagas Dwi Andra | 103072400144 | Pitfall 3 |
+| Brian Alfredo Adhita Putra | 103072400165 | Pitfall 3 |
+| M Gibran Khalilullah | 103072400014 | Pitfall 2 |
 
-## Pitfall 1: [nama pitfall] — ditulis oleh [nama]
+## Pitfall 1: The Network Is Reliable — ditulis oleh Aria Restu Pambudi
 
-**Bukti di skenario:** [kutip/paraphrase bagian skenario]
+**Bukti di skenario:** 
+Kode FoodGo berisi asumsi `# network is always reliable, no need for retry`. Tidak ada mekanisme penanganan kegagalan saat modul pesanan memanggil modul pembayaran.
 
-**Kenapa ini keliru:** [penjelasan]
+**Kenapa ini keliru:** 
+Dalam sistem terdistribusi, paket bisa hilang, koneksi bisa putus, dan service tujuan bisa sedang restart atau overload. Kegagalan sementara (transient failure) adalah kondisi normal, terutama saat trafik tinggi, sehingga harus dirancang sejak awal.
 
-**Dampak ke FoodGo:** [mekanisme kegagalan konkret]
+**Dampak ke FoodGo:** 
+Satu panggilan ke modul pembayaran yang gagal sesaat langsung menjadi pesanan gagal. Tanpa retry, pelanggan harus mengulang dari awal. Kondisi ini paling sering terjadi saat jam makan siang atau promo, yaitu saat jaringan dan service paling tertekan.
 
-**Solusi desain awal:** [usulan solusi]
+**Solusi desain awal:** 
+Terapkan retry dengan exponential backoff + jitter hanya untuk operasi yang aman diulang. Buat pembayaran bersifat idempotent dengan idempotency key agar retry tidak menyebabkan pelanggan ditagih dua kali. Tambahkan circuit breaker agar service yang sedang bermasalah tidak terus dipanggil.
 
-**Trade-off:** [apa yang dikorbankan/risiko dari solusi ini]
+**Trade-off:** 
+Retry yang tidak terkendali justru memperparah beban saat service sudah kewalahan (retry storm, cascading failure). Karena itu retry harus dibatasi jumlahnya, diberi jitter, dan dipasangkan dengan circuit breaker. Idempotency juga menambah kompleksitas implementasi dan penyimpanan state.
 
 ---
 
