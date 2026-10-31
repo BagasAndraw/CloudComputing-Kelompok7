@@ -75,3 +75,56 @@ Kami memilih **kombinasi SOA + Publish-Subscribe**:
 | Pub-Sub murni (semua event) | Pembayaran butuh kepastian hasil sebelum pesanan diteruskan, dan validasi menu/harga butuh jawaban langsung. Memaksa semuanya jadi event membuat alur checkout rumit dan status pesanan membingungkan pelanggan. |
 
 Kombinasi ini menempatkan komunikasi sinkron hanya di tempat yang memang butuh kepastian, dan asinkron di tempat yang butuh keterlepasan (*decoupling*).
+
+---
+
+## 2. Diagram Komponen
+
+Garis *solid* = komunikasi sinkron (request-response). <br>
+Garis *putus-putus* = komunikasi asinkron (event / push).
+
+```mermaid
+flowchart LR
+  Pelanggan["Aplikasi Pelanggan"]
+  Resto["Aplikasi Resto"]
+  Kurir["Aplikasi Kurir"]
+  GW["API Gateway"]
+
+  subgraph Core["Service Inti (SOA, sinkron)"]
+    Order["Service Pesanan"]
+    Payment["Service Pembayaran"]
+    Catalog["Service Katalog Resto"]
+  end
+
+  subgraph Async["Sisi Event (Pub-Sub, asinkron)"]
+    Broker[("Message Broker")]
+    Notif["Service Kurir dan Notifikasi"]
+  end
+
+  PG["Payment Gateway Eksternal"]
+
+  Pelanggan -->|"HTTPS"| GW
+  GW -->|"REST: buat pesanan"| Order
+  GW -->|"REST: lihat menu"| Catalog
+  Order -->|"REST: validasi menu dan harga"| Catalog
+  Order -->|"REST + idempotency key"| Payment
+  Payment -->|"HTTPS"| PG
+
+  Order -.->|"publish OrderPaid"| Broker
+  Broker -.->|"subscribe OrderPaid"| Notif
+  Broker -.->|"subscribe OrderPaid: kurangi stok"| Catalog
+  Notif -.->|"publish CourierAssigned"| Broker
+  Broker -.->|"subscribe CourierAssigned"| Order
+
+  Notif -.->|"push: pesanan baru"| Resto
+  Notif -.->|"push: tugas antar"| Kurir
+```
+
+**Catatan desain:**
+
+- Database per service. Pesanan, Pembayaran, dan Katalog masing-masing punya penyimpanan sendiri. Tidak ada service yang membaca tabel milik service lain, hanya lewat API atau event.
+- API Gateway menjadi satu pintu masuk untuk aplikasi pelanggan, sehingga perubahan alamat atau jumlah instance di belakangnya tidak terlihat oleh klien.
+- Message Broker menyimpan event secara durable, jadi jika Service Notifikasi sedang di-deploy ulang, event tetap menunggu di antrean dan diproses setelah service kembali hidup.
+- Panggilan sinkron memakai perlindungan dari Tugas 1: timeout, retry berbackoff untuk operasi idempotent, dan circuit breaker.
+
+---
