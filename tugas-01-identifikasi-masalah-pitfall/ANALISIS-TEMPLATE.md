@@ -28,18 +28,22 @@ Retry yang tidak terkendali justru memperparah beban saat service sudah kewalaha
 
 ---
 
-## Pitfall 2: [nama pitfall] — ditulis oleh [nama]
+## Pitfall 2: Latency is Zero (tanpa timeout pada panggilan antar service) — ditulis oleh Brian Alfredo dan Bagas Dwi Andra
 
-**Bukti di skenario**
+**Bukti di skenario:**
 Tidak ada timeout sama sekali pada pemanggilan antar service. Modul pesanan memanggil modul pembayaran dan menunggu tanpa batas waktu. Gejalanya: aplikasi sangat lambat, beberapa permintaan timeout, dan server kadang crash total.
 
-**Kenapa ini keliru**
+**Kenapa ini keliru:**
 Panggilan jaringan tidak seperti pemanggilan fungsi lokal. Latensinya bervariasi dan bisa melonjak tak terbatas saat beban tinggi. Menunggu tanpa batas berarti menggantungkan resource sendiri pada kecepatan pihak lain.
 
-**Dampak ke FoodGo**
+**Dampak ke FoodGo:**
 Saat modul pembayaran melambat, setiap request pesanan menahan satu thread atau koneksi sambil menunggu. Request baru terus masuk, thread pool dan memori habis, lalu modul pesanan ikut tidak responsif dan akhirnya server crash. Jadi lambatnya satu komponen merembet menjadi kegagalan total (cascading failure) dan perlu restart manual.
 
----
+**Solusi desain awal:** 
+Pasang timeout pada semua panggilan antar service, dengan nilai berdasarkan latensi normal (misalnya persentil ke-99 ditambah margin). Gunakan bulkhead (thread pool atau koneksi terpisah per dependensi) agar pembayaran yang lambat tidak menghabiskan resource modul pesanan. Untuk proses yang tidak harus real-time, seperti notifikasi kurir, gunakan komunikasi asinkron lewat message queue.
+
+**Trade-off:** 
+Timeout yang terlalu pendek menyebabkan false failure, yaitu request yang sebenarnya akan sukses malah dibatalkan, dan ini bisa memicu retry yang menambah beban. Timeout yang terlalu panjang tidak melindungi sistem. Komunikasi asinkron membuat sistem eventually consistent, sehingga pengguna tidak langsung melihat status final dan alur kerja menjadi lebih sulit di-debug.
 
 ## Pitfall 3: [nama pitfall] — ditulis oleh [nama]
 
