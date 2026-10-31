@@ -30,7 +30,14 @@ Retry yang tidak terkendali justru memperparah beban saat service sudah kewalaha
 
 ## Pitfall 2: [nama pitfall] — ditulis oleh [nama]
 
-(ulangi struktur di atas)
+**Bukti di skenario**
+Tidak ada timeout sama sekali pada pemanggilan antar service. Modul pesanan memanggil modul pembayaran dan menunggu tanpa batas waktu. Gejalanya: aplikasi sangat lambat, beberapa permintaan timeout, dan server kadang crash total.
+
+**Kenapa ini keliru**
+Panggilan jaringan tidak seperti pemanggilan fungsi lokal. Latensinya bervariasi dan bisa melonjak tak terbatas saat beban tinggi. Menunggu tanpa batas berarti menggantungkan resource sendiri pada kecepatan pihak lain.
+
+**Dampak ke FoodGo**
+Saat modul pembayaran melambat, setiap request pesanan menahan satu thread atau koneksi sambil menunggu. Request baru terus masuk, thread pool dan memori habis, lalu modul pesanan ikut tidak responsif dan akhirnya server crash. Jadi lambatnya satu komponen merembet menjadi kegagalan total (cascading failure) dan perlu restart manual.
 
 ---
 
